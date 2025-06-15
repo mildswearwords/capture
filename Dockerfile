@@ -1,10 +1,10 @@
 # Use an official Node.js runtime as a base image
 FROM node:16-slim
 
-# Install necessary dependencies for Puppeteer
-WORKDIR /usr/app
-COPY ./ /usr/app
+# Set the working directory
+WORKDIR /usr/src/app
 
+# Install system dependencies required for Puppeteer
 RUN apt-get update && apt-get install -y \
   wget \
   ca-certificates \
@@ -23,22 +23,29 @@ RUN apt-get update && apt-get install -y \
   libxdamage1 \
   libxrandr2 \
   xdg-utils \
-  --no-install-recommends
+  --no-install-recommends \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Puppeteer (it'll automatically install Chromium)
-RUN npm install puppeteer
+# Copy package files separately to leverage Docker cache
+COPY package*.json ./
 
-# Install Google Cloud client libraries
-RUN npm install @google-cloud/firestore @google-cloud/storage
+# Install Node.js dependencies
+RUN npm install
 
-# Set the working directory
-WORKDIR /usr/src/app
-
-# Copy the script into the container
+# Copy the rest of your application code
 COPY . .
 
-# Expose the port for the service to listen on
+# Puppeteer requires a non-root user to run Chromium
+RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser && \
+  mkdir -p /home/pptruser/Downloads && \
+  chown -R pptruser:pptruser /home/pptruser && \
+  chown -R pptruser:pptruser /usr/src/app
+
+# Switch to non-root user
+USER pptruser
+
+# Expose the port your app listens on (Cloud Run uses 8080)
 EXPOSE 8080
 
-# Start the Node.js app
+# Run your app
 CMD ["node", "index.js"]

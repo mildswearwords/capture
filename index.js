@@ -2,6 +2,11 @@ const puppeteer = require('puppeteer');
 const {Firestore} = require('@google-cloud/firestore');
 const {Storage} = require('@google-cloud/storage');
 
+const express = require('express');
+const app = express();
+
+app.use(express.json()); // Parse JSON body
+
 // Setup dbs and buckets
 const db = new Firestore();
 const storage = new Storage();
@@ -105,5 +110,20 @@ async function main() {
   }
   console.log('[MAIN] Run complete');
 }
+app.post('/', async (req, res) => {
+  console.log('[TRIGGERED] Pub/Sub event received');
 
-main();
+  try {
+    await main(); // Call your scraping function
+    res.status(200).send('Scrape run completed.');
+  } catch (e) {
+    console.error(`[ERROR] ${e.message}`);
+    res.status(500).send('Error running scrape.');
+  }
+});
+
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`[INIT] Listening on port ${PORT}`);
+});
+
